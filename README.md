@@ -21,6 +21,7 @@ this code uses Big Buck Bunny by Blender Foundation, which I converted to MPEG1 
 - use a precision timer for playback
   - like: decode frame, wait For the timer, display And already decode the Next frame
 - make a Github-repo and upload it
+- play file from memory
 
 
 ## How-To:
