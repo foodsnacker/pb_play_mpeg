@@ -1,4 +1,4 @@
-#pb_play_mpeg v 0.1
+# pb_play_mpeg v 0.1
 
 by Jörg Burbach, [homepage](https://joerg-burbach.de)
 license: MIT
@@ -6,14 +6,14 @@ This is a wrapper around the one-file mpeg-1-decoder pl_mpeg.h. This source also
 
 based on pl_mpeg.h by Dominic Szablewski, [Repository on Github](https://github.com/phoboslab/pl_mpeg)
 
-##functions
+## functions
 - load from disk
 - check for mpeg-file
 - decode video and audio frames on demand
 - get information about the video
 - enable or disable video or audio
 
-##todo
+## todo
 - improve and optimize the code
 - play audio as a test case
 - use a precision timer for playback
@@ -21,9 +21,9 @@ based on pl_mpeg.h by Dominic Szablewski, [Repository on Github](https://github.
 - make a Github-repo and upload it
 
 
-#How-To:
+## How-To:
 
-##macOS:
+### macOS:
 1. get the source from pl_mpeg
 2. write a small snippet to pl_mpeg.c
 
