@@ -24,7 +24,8 @@ based on pl_mpeg.h by Dominic Szablewski, [Repository on Github](https://github.
 ## How-To:
 
 ### macOS:
-1. get the source from pl_mpeg
+1. pull the source for pl_mpeg.h from [Repository on Github](https://github.com/phoboslab/pl_mpeg)
+
 2. write a small snippet to pl_mpeg.c
 
 ```
