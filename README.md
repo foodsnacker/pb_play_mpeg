@@ -1,7 +1,9 @@
 # pb_play_mpeg v 0.1
 
 by Jörg Burbach, [homepage](https://joerg-burbach.de)
+
 license: MIT
+
 This is a wrapper around the one-file mpeg-1-decoder pl_mpeg.h. This source also demonstrates how to (not elegantly) play a file in an imagegadget. However, audio is missing at the moment. Have to figure that out.
 
 based on pl_mpeg.h by Dominic Szablewski, [Repository on Github](https://github.com/phoboslab/pl_mpeg)
@@ -20,7 +22,7 @@ this code uses Big Buck Bunny by Blender Foundation, which I converted to MPEG1 
 - play audio as a test case
 - use a precision timer for playback
   - like: decode frame, wait For the timer, display And already decode the Next frame
-- make a Github-repo and upload it
+- ~~make a Github-repo and upload it~~
 - play file from memory
 
 
@@ -53,6 +55,7 @@ extern "C" {
 4. put the resulting libplmpeg.a where you have your PureBasic-code
 
 5. check the example!
+
 5b. If you need to convert your movie, use ffmpeg
 ```
 ffmpeg -i movie.mp4 -c:v mpeg1video -b:v 500k -c:a mp2 -b:a 64k -s 320x240 -t 30 output.mpg 
