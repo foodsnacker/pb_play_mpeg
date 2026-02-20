@@ -86,7 +86,7 @@ EndStructure
 Structure plm_samples_t Align #PB_Structure_AlignC
   time.d
   count.l
-  interleaved.f[#PLM_AUDIO_SAMPLES_PER_FRAME]
+  interleaved.f[#PLM_AUDIO_SAMPLES_PER_FRAME * 2]  ; stereo: 2 channels × 1152 = 2304 floats
 EndStructure
 
 Procedure plm_Convert_Frame_to_Image(*input, inputwidth, inputheight)
