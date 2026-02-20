@@ -24,63 +24,53 @@ IncludeFile "mac_audio_out.pb"
 #RB_SIZE = 32768
 #RB_MASK = #RB_SIZE - 1
 
-; Monotonically increasing write / read counters (only wrap on 64-bit integer overflow – harmless).
+; Monotonically increasing write / read counters.
 ; rb_write is written by the main thread only; rb_read by the audio thread only.
-Global rb_write.i = 0   ; samples pushed so far
-Global rb_read.i  = 0   ; samples consumed so far
+Global rb_write.i = 0
+Global rb_read.i  = 0
 
-; Separate L and R sample arrays (non-interleaved) so the render callback can hand them
-; directly to MacAudioOut without an extra copy.
+; Separate L and R arrays so the render callback can pass them directly to MacAudioOut.
 Global Dim rb_L.f(#RB_SIZE - 1)
 Global Dim rb_R.f(#RB_SIZE - 1)
 
-; Returns number of samples currently available for the audio callback to read.
-Procedure.i RB_Available()
-  ProcedureReturn rb_write - rb_read
-EndProcedure
-
-; Returns free space (samples the main thread may safely write without overwriting unread data).
 Procedure.i RB_Free()
   ProcedureReturn #RB_SIZE - (rb_write - rb_read)
 EndProcedure
 
-; Push one decoded plm_samples_t into the ring buffer.
-; plm_samples_t\interleaved layout: L0, R0, L1, R1, ... (stereo interleaved, 32-bit float)
+; Push one decoded plm_samples_t (stereo interleaved: L0,R0,L1,R1,...) into the ring buffer.
 Procedure RB_Push(*s.plm_samples_t)
   Protected i.i
-  Protected w.i  = rb_write
+  Protected w.i    = rb_write
   Protected free.i = RB_Free()
-  Protected n.i  = *s\count
-  If n > free : n = free : EndIf   ; drop excess if buffer is full (shouldn't happen with pre-fill)
+  Protected n.i    = *s\count
+  If n > free : n = free : EndIf
   For i = 0 To n - 1
-    rb_L(w & #RB_MASK) = *s\interleaved[i * 2]       ; left channel
-    rb_R(w & #RB_MASK) = *s\interleaved[i * 2 + 1]   ; right channel
+    rb_L(w & #RB_MASK) = *s\interleaved[i * 2]
+    rb_R(w & #RB_MASK) = *s\interleaved[i * 2 + 1]
     w + 1
   Next
-  rb_write = w  ; publish – audio thread reads this after the loop
+  rb_write = w
 EndProcedure
 
 ;---- MacAudioOut render callback --------------------------------------------------------------
-; Called on the CoreAudio real-time thread. Must not allocate memory or block.
-; Reads from the ring buffer; outputs silence on underrun.
+; Called on the CoreAudio real-time thread. Must not allocate or block.
 ProcedureC AudioRenderCallback(*left.Float, *right.Float, frames.i, sampleRate.i, userData.i)
   Protected i.i
   Protected r.i     = rb_read
-  Protected avail.i = rb_write - r   ; snapshot of available samples
+  Protected avail.i = rb_write - r
 
   For i = 0 To frames - 1
     If i < avail
       *left\f  = rb_L((r + i) & #RB_MASK)
       *right\f = rb_R((r + i) & #RB_MASK)
     Else
-      *left\f  = 0.0   ; underrun – output silence
+      *left\f  = 0.0   ; underrun – silence
       *right\f = 0.0
     EndIf
     *left  + SizeOf(Float)
     *right + SizeOf(Float)
   Next
 
-  ; Advance read pointer by however many real samples we consumed
   If avail >= frames
     rb_read = r + frames
   Else
@@ -89,7 +79,7 @@ ProcedureC AudioRenderCallback(*left.Float, *right.Float, frames.i, sampleRate.i
 EndProcedure
 
 ;---- Open MPEG file ---------------------------------------------------------------------------
-Define mpeg     = plm_create_with_filename("big_buck_bunny.mpg")
+Define mpeg = plm_create_with_filename("big_buck_bunny.mpg")
 
 If mpeg = 0
   MessageRequester("Error", "Could not open big_buck_bunny.mpg")
@@ -115,40 +105,26 @@ If *pixels = 0
   End 1
 EndIf
 
-;---- Pre-fill ring buffer with ~0.3 s of audio -----------------------------------------------
-; Start decoding from the beginning so audio is ready before the first video frame is shown.
-Define *prefillSamples.plm_samples_t
-Define prefillTarget.i = samplerate / 3    ; ~333 ms
-While RB_Available() < prefillTarget
-  *prefillSamples = plm_decode_audio(mpeg)
-  If *prefillSamples = 0 : Break : EndIf
-  RB_Push(*prefillSamples)
-Wend
-
-; Rewind so video and audio both start at t=0
-plm_rewind(mpeg)
-
-; The pre-fill samples are still in the ring buffer; the decoder position is at the beginning,
-; so audio frames will be re-decoded and will naturally catch up.  The initial latency (~333 ms)
-; prevents underruns during the first few video frames.
-
-;---- Init audio output ------------------------------------------------------------------------
-MacAudioOut::SetRenderCallback(@AudioRenderCallback())
+;---- Init audio output -----------------------------------------------------------------------
+; IMPORTANT: Init() first, then SetRenderCallback().
+; Init() resets the internal callback snapshots to 0, so any SetRenderCallback() call
+; made before Init() would be silently overwritten, leaving only the default sine output.
 If MacAudioOut::Init(samplerate) = #False
   MessageRequester("Error", "MacAudioOut::Init failed (OSStatus=" + Str(MacAudioOut::LastStatus()) + ")")
   FreeMemory(*pixels)
   plm_destroy(mpeg)
   End 1
 EndIf
+MacAudioOut::SetRenderCallback(@AudioRenderCallback())   ; after Init() !
 MacAudioOut::SetVolume(0.85)
 
-;---- Open window ------------------------------------------------------------------------------
+;---- Open window -----------------------------------------------------------------------------
 OpenWindow(0, 100, 60, width, height, "MPEG Player – " + width + "×" + height +
            "  " + StrD(framerate, 2) + " fps  " + Str(samplerate) + " Hz  " +
            StrD(duration, 1) + " s")
 ImageGadget(0, 0, 0, WindowWidth(0), WindowHeight(0), 0)
 
-;---- Start audio playback ---------------------------------------------------------------------
+;---- Start audio playback --------------------------------------------------------------------
 If MacAudioOut::Play() = #False
   MessageRequester("Error", "MacAudioOut::Play failed (OSStatus=" + Str(MacAudioOut::LastStatus()) + ")")
   MacAudioOut::Shutdown()
@@ -157,17 +133,20 @@ If MacAudioOut::Play() = #False
   End 1
 EndIf
 
-;---- Main playback loop -----------------------------------------------------------------------
-; Strategy:
+;---- Main playback loop ----------------------------------------------------------------------
+; Each iteration:
 ;   1. Decode the next video frame.
-;   2. Decode audio frames until audio time ≥ video time (keeps A/V in sync).
-;   3. Push decoded audio into the ring buffer.
-;   4. Display the video frame.
-;   5. Wait until the wall-clock time matches the frame's presentation time.
+;   2. Decode audio frames until the audio timestamp has caught up with the video timestamp.
+;      (We snapshot the video time *before* decoding audio, because plm_get_time() also
+;       advances when audio frames are decoded and would make the Until condition trivially
+;       true after just one audio frame.)
+;   3. Display the video frame.
+;   4. Sleep until wall-clock time matches the frame's presentation time.
 
 Define *frame.plm_frame_t
 Define *samples.plm_samples_t
 Define myimage.i
+Define videoTime.d
 Define startWall.i  = ElapsedMilliseconds()
 Define frameCount.i = 0
 Define msPerFrame.d = 1000.0 / framerate
@@ -183,17 +162,18 @@ While running
     Break
   EndIf
 
-  ;-- Decode audio up to the current video timestamp ------------------------------------
-  ; plm_get_time() returns the decoder's current position (tracks video).
-  ; We keep decoding audio frames while the ring has room and audio lags behind video.
+  ;-- Decode audio up to the video frame's timestamp ----------------------------------------
+  ; Save video time now – plm_get_time() would change once we start decoding audio.
+  videoTime = plm_get_time(mpeg)
+
   Repeat
     If RB_Free() < #PLM_AUDIO_SAMPLES_PER_FRAME : Break : EndIf
     *samples = plm_decode_audio(mpeg)
     If *samples = 0 : Break : EndIf
     RB_Push(*samples)
-  Until *samples\time >= plm_get_time(mpeg)
+  Until *samples\time >= videoTime
 
-  ;-- Render video frame to ImageGadget -------------------------------------------------
+  ;-- Render video frame to ImageGadget -------------------------------------------------------
   plm_frame_to_rgb(*frame, *pixels, width * 3)
   myimage = plm_Convert_Frame_to_Image(*pixels, width, height)
   SetGadgetState(0, ImageID(myimage))
@@ -201,14 +181,14 @@ While running
 
   frameCount + 1
 
-  ;-- Frame timing: wait until the wall clock reaches the frame's due time ---------------
+  ;-- Frame timing ----------------------------------------------------------------------------
   Define dueMs.i = startWall + frameCount * msPerFrame
   Define nowMs.i = ElapsedMilliseconds()
   If nowMs < dueMs
     Delay(dueMs - nowMs)
   EndIf
 
-  ;-- Process window events (close button etc.) -----------------------------------------
+  ;-- Window events ---------------------------------------------------------------------------
   event = WindowEvent()
   If event = #PB_Event_CloseWindow
     running = #False
