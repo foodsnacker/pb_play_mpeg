@@ -219,10 +219,18 @@ Module MacAudioOut
           ApplyVolume(g\tempLeft, g\tempRight, inNumberFrames, volume)
           For i = 0 To inNumberFrames - 1
             For ch = 0 To channels0 - 1
-              PokeF(*left  + ((i * channels0 + ch) * SizeOf(Float)), IIf(ch = 0, PeekF(g\tempLeft  + i * SizeOf(Float)), 0.0))
+              If ch = 0
+                PokeF(*left + ((i * channels0 + ch) * SizeOf(Float)), PeekF(g\tempLeft + i * SizeOf(Float)))
+              Else
+                PokeF(*left + ((i * channels0 + ch) * SizeOf(Float)), 0.0)
+              EndIf
             Next
             For ch = 0 To channels1 - 1
-              PokeF(*right + ((i * channels1 + ch) * SizeOf(Float)), IIf(ch = 0, PeekF(g\tempRight + i * SizeOf(Float)), 0.0))
+              If ch = 0
+                PokeF(*right + ((i * channels1 + ch) * SizeOf(Float)), PeekF(g\tempRight + i * SizeOf(Float)))
+              Else
+                PokeF(*right + ((i * channels1 + ch) * SizeOf(Float)), 0.0)
+              EndIf
             Next
           Next
         Else
